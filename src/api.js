@@ -214,6 +214,16 @@ async function sendChatMessage(axiosInstance, message, agentId, userAddress, cha
       return await axiosInstance.post('/v1/chat', payload);
     }, 3, 5000, 30000); // 3 retries, starting with 5s delay, max 30s delay
     
+    // Check if response indicates insufficient balance
+    if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      const firstMessage = response.data[0];
+      if (firstMessage.message === "Insufficient balance.") {
+        logger.warn(`Insufficient balance detected for wallet ${userAddress}. Stopping chat session.`, { wallet: userAddress });
+        // Return special indicator that balance is insufficient
+        return { insufficientBalance: true };
+      }
+    }
+    
     // Add random delay between requests to appear more human-like
     await sleep(randomDelay(config.requestDelay.min, config.requestDelay.max));
     
