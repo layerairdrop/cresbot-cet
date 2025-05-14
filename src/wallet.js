@@ -58,6 +58,11 @@ async function checkWalletCredit(authData, proxyAgent = null) {
     // Log complete credit information
     logger.info(`Credit balance for ${formatWalletAddress(walletAddress)}: ${creditBalance.toFixed(4)} (Free: ${freeCredits.toFixed(4)}, Total Available: ${totalAvailableCredits.toFixed(4)})`, { wallet: walletAddress });
     
+    // Check if we actually have a negative balance with insufficient free credits
+    if (creditBalance < 0 && Math.abs(creditBalance) > freeCredits) {
+      logger.warn(`Wallet ${walletAddress} has negative balance (${creditBalance.toFixed(4)}) with insufficient free credits (${freeCredits.toFixed(4)}). Will likely encounter "Insufficient balance" errors.`, { wallet: walletAddress });
+    }
+    
     return {
       creditBalance,
       freeCredits,
