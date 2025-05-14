@@ -49,6 +49,12 @@ async function startChatSession(authData, chatPrompts, proxyAgent = null) {
     
     const initialResponse = await sendChatMessage(api, initialPrompt, agentId, walletAddress, chatId);
     
+    // Check if we got an insufficient balance response
+    if (initialResponse && initialResponse.insufficientBalance === true) {
+      logger.warn(`Insufficient balance for wallet ${walletAddress}. Moving to next wallet.`, { wallet: walletAddress });
+      return false;
+    }
+    
     if (!initialResponse || initialResponse.length === 0) {
       logger.error(`Failed to get initial response`, { wallet: walletAddress });
       return false;
@@ -65,8 +71,6 @@ async function startChatSession(authData, chatPrompts, proxyAgent = null) {
       // Continue anyway, assuming the chat was created successfully
       chatHistory = [];
     }
-    
-    // We don't need to check chatHistory length here; proceed with sending messages
     
     // Start conversation with random prompts based on config settings
     const { min, max } = config.chatSession.messageCount;
@@ -105,6 +109,12 @@ async function startChatSession(authData, chatPrompts, proxyAgent = null) {
       logger.info(`Sending message ${i+1}/${promptCount}: "${prompt}"`, { wallet: walletAddress });
       
       const response = await sendChatMessage(api, prompt, agentId, walletAddress, chatId);
+      
+      // Check if we got an insufficient balance response
+      if (response && response.insufficientBalance === true) {
+        logger.warn(`Insufficient balance detected during chat session for wallet ${walletAddress}. Moving to next wallet.`, { wallet: walletAddress });
+        return false;
+      }
       
       if (!response || response.length === 0) {
         logger.warn(`No response received for message ${i+1}`, { wallet: walletAddress });
