@@ -1,21 +1,21 @@
 {
   "minCreditBalance": 10,
   "requestDelay": {
-    "min": 3000,
-    "max": 8000
+    "min": 5000,
+    "max": 10000
   },
   "chatSession": {
     "messageCount": {
-      "min": 27,
-      "max": 35
+      "min": 20,
+      "max": 30
     },
     "typingDelay": {
       "min": 8000,
       "max": 15000
     },
     "sessionDelay": {
-      "min": 45000,
-      "max": 90000
+      "min": 60000,
+      "max": 120000
     }
   },
   "chatPrompts": [
