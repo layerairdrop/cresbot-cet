@@ -138,10 +138,15 @@ async function processWalletSession(privateKey) {
   const { wallet, authData, creditData } = walletData;
   
   // Check if wallet has enough credits
+  // Wallet has enough credits if totalAvailableCredits >= minCreditBalance
+  // (Make sure to check free credits too)
   if (creditData.totalAvailableCredits < config.minCreditBalance) {
-    logger.warn(`Insufficient credits for wallet ${wallet.address}. Total available: ${creditData.totalAvailableCredits.toFixed(4)}. Skipping.`, { wallet: wallet.address });
+    logger.warn(`Insufficient credits for wallet ${wallet.address}. Total available: ${creditData.totalAvailableCredits.toFixed(4)} (Balance: ${creditData.creditBalance.toFixed(4)}, Free: ${creditData.freeCredits.toFixed(4)}). Skipping.`, { wallet: wallet.address });
     return false;
   }
+  
+  // Log the credit information
+  logger.info(`Wallet ${wallet.address} has sufficient credits. Total available: ${creditData.totalAvailableCredits.toFixed(4)} (Balance: ${creditData.creditBalance.toFixed(4)}, Free: ${creditData.freeCredits.toFixed(4)})`, { wallet: wallet.address });
   
   // Start chat session
   logger.info(`Starting chat session for wallet ${wallet.address}`, { wallet: wallet.address });
