@@ -1,0 +1,49 @@
+{
+  "minCreditBalance": 10,
+  "requestDelay": {
+    "min": 3000,
+    "max": 8000
+  },
+  "chatSession": {
+    "messageCount": {
+      "min": 27,
+      "max": 35
+    },
+    "typingDelay": {
+      "min": 8000,
+      "max": 15000
+    },
+    "sessionDelay": {
+      "min": 45000,
+      "max": 90000
+    }
+  },
+  "chatPrompts": [
+    "What are the most promising upcoming airdrops?",
+    "How do I qualify for the LayerZero airdrop?",
+    "What is the best strategy to maximize airdrop rewards?",
+    "Can you explain how airdrops work?",
+    "What are some recent successful airdrops?",
+    "Are there any airdrops happening this month?",
+    "How do I check if I'm eligible for an airdrop?",
+    "What are gas fees and how do they affect airdrops?",
+    "What's the difference between retroactive and standard airdrops?",
+    "How can I stay updated on upcoming airdrops?",
+    "What are the risks associated with claiming airdrops?",
+    "Which blockchain has the most airdrops right now?",
+    "How do I set up a wallet for receiving airdrops?",
+    "What's the typical value of an airdrop?",
+    "How do projects choose who gets airdrops?",
+    "What criteria do projects consider for airdrop distribution?",
+    "Are there tax implications for receiving airdrops?",
+    "How long should I hold airdropped tokens?",
+    "What are some airdrop scams to watch out for?",
+    "Which crypto communities announce airdrops regularly?"
+  ],
+  "ipCheckServices": [
+    "https://api.ipify.org/?format=json",
+    "https://ifconfig.me/ip",
+    "https://api.myip.com",
+    "https://icanhazip.com"
+  ]
+}
