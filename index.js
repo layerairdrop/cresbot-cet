@@ -138,8 +138,8 @@ async function processWalletSession(privateKey) {
   const { wallet, authData, creditData } = walletData;
   
   // Check if wallet has enough credits
-  if (creditData.creditBalance < config.minCreditBalance) {
-    logger.warn(`Insufficient credits for wallet ${wallet.address}. Skipping.`, { wallet: wallet.address });
+  if (creditData.totalAvailableCredits < config.minCreditBalance) {
+    logger.warn(`Insufficient credits for wallet ${wallet.address}. Total available: ${creditData.totalAvailableCredits.toFixed(4)}. Skipping.`, { wallet: wallet.address });
     return false;
   }
   
