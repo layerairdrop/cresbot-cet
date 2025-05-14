@@ -57,12 +57,16 @@ async function startChatSession(authData, chatPrompts, proxyAgent = null) {
     logger.success(`Received initial response from Layer Airdrop`, { wallet: walletAddress });
     
     // Get chat history to verify
-    const chatHistory = await getChatHistory(api, agentId, chatId);
-    
-    if (!chatHistory || chatHistory.length === 0) {
-      logger.error(`Failed to get chat history`, { wallet: walletAddress });
-      return false;
+    let chatHistory;
+    try {
+      chatHistory = await getChatHistory(api, agentId, chatId);
+    } catch (error) {
+      logger.warn(`Failed to get chat history: ${error.message}`, { wallet: walletAddress });
+      // Continue anyway, assuming the chat was created successfully
+      chatHistory = [];
     }
+    
+    // We don't need to check chatHistory length here; proceed with sending messages
     
     // Start conversation with random prompts based on config settings
     const { min, max } = config.chatSession.messageCount;
