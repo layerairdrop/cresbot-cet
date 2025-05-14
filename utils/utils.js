@@ -174,8 +174,10 @@ function getRandomItem(arr, index) {
  * @returns {string} Unique chat ID
  */
 function generateChatId(walletAddress) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  return `${walletAddress}-${timestamp}`;
+  // Generate a unique identifier using current timestamp and a random string
+  const timestamp = Math.floor(Date.now());
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  return `${walletAddress}-${timestamp}-${randomStr}`;
 }
 
 /**
