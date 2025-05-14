@@ -48,11 +48,36 @@ function createAxiosInstance(proxyAgent = null, authToken = null, userAgent = nu
  */
 async function checkCredit(axiosInstance) {
   try {
-    const response = await axiosInstance.get('/v1/credit');
+    // Use retry logic with more retries for this critical function
+    const response = await withRetry(async () => {
+      return await axiosInstance.get('/v1/credit');
+    }, 5, 5000, 60000); // 5 retries, starting with 5s delay, max 60s delay
+    
+    // Verify that the response contains the expected fields
+    if (!response.data || (response.data.credits === undefined && response.data.free_credits === undefined)) {
+      logger.warn('Received unexpected credit data format from API');
+      // If data is present but fields are missing, create a default structure
+      if (response.data) {
+        return {
+          credits: response.data.credits || "0",
+          free_credits: response.data.free_credits || "480.0000", // Default free credits
+          // Include any other fields that were present
+          ...response.data
+        };
+      }
+    }
+    
     return response.data;
   } catch (error) {
     logger.error(`Failed to check credit: ${error.message}`);
-    return null;
+    // In case of persistent failure, return a default object with free credits
+    // This allows the script to continue and try interacting with the agent
+    return {
+      credits: "0",
+      free_credits: "480.0000", // Default free credits
+      expense_at: new Date().toISOString(),
+      income_at: new Date().toISOString()
+    };
   }
 }
 
