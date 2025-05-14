@@ -48,10 +48,14 @@ async function checkWalletCredit(authData, proxyAgent = null) {
       return null;
     }
     
+    // Parse credit values, ensuring they're valid numbers
     const creditBalance = parseFloat(creditData.credits || 0);
     const freeCredits = parseFloat(creditData.free_credits || 0);
+    
+    // Calculate total available credits (regular balance + free credits)
     const totalAvailableCredits = creditBalance + freeCredits;
     
+    // Log complete credit information
     logger.info(`Credit balance for ${formatWalletAddress(walletAddress)}: ${creditBalance.toFixed(4)} (Free: ${freeCredits.toFixed(4)}, Total Available: ${totalAvailableCredits.toFixed(4)})`, { wallet: walletAddress });
     
     return {
