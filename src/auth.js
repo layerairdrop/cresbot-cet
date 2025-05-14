@@ -139,16 +139,29 @@ async function login(privyToken, walletAddress, proxyAgent = null, userAgent = n
       user_address: walletAddress
     };
     
-    // Use retry logic for login
-    const response = await withRetry(async () => {
-      return await axios.post('https://api.service.crestal.network/v1/login?is_privy=true', payload, {
-        headers,
-        httpAgent: proxyAgent,
-        httpsAgent: proxyAgent
-      });
-    }, 3, 5000, 60000); // 3 retries, starting with 5s delay, max 60s delay
-    
-    return response.data;
+    // Use retry logic for login, but handle 404 differently
+    try {
+      const response = await withRetry(async () => {
+        const res = await axios.post('https://api.service.crestal.network/v1/login?is_privy=true', payload, {
+          headers,
+          httpAgent: proxyAgent,
+          httpsAgent: proxyAgent
+        });
+        return res;
+      }, 3, 5000, 60000); // 3 retries, starting with 5s delay, max 60s delay
+      
+      return response.data;
+    } catch (error) {
+      // If we get a 404, it likely means this wallet hasn't been registered with the platform
+      // or the privy token is invalid
+      if (error.response && error.response.status === 404) {
+        logger.error(`Wallet ${walletAddress} login returned 404 - This wallet may not be registered with Layer Airdrop`, { wallet: walletAddress });
+        return null;
+      }
+      
+      // For other errors, just propagate them
+      throw error;
+    }
   } catch (error) {
     logger.error(`Failed to login: ${error.message}`);
     return null;
@@ -197,15 +210,31 @@ async function authenticate(privateKey, proxyAgent = null) {
     const userAgent = getRandomUserAgent();
     logger.debug(`Selected User-Agent for wallet ${walletAddress}: ${userAgent.substring(0, 30)}...`, { wallet: walletAddress });
     
-    // Step 1: Initialize SIWE
-    const siweData = await initSIWE(walletAddress, proxyAgent, userAgent);
-    if (!siweData) {
-      logger.error(`SIWE initialization failed for ${walletAddress}`, { wallet: walletAddress });
-      return null;
-    }
+    // Make multiple attempts at the SIWE process with different user agents if needed
+    let authSuccess = false;
+    let authData = null;
+    let attemptCount = 0;
+    const maxAttempts = 2; // Try up to 2 different user agents
     
-    // Prepare SIWE message
-    const message = `nation.fun wants you to sign in with your Ethereum account:
+    while (!authSuccess && attemptCount < maxAttempts) {
+      attemptCount++;
+      
+      // If this is not the first attempt, get a new user agent
+      const currentUserAgent = attemptCount === 1 ? userAgent : getRandomUserAgent();
+      if (attemptCount > 1) {
+        logger.info(`Retrying authentication with new User-Agent for wallet ${walletAddress}`, { wallet: walletAddress });
+      }
+      
+      try {
+        // Step 1: Initialize SIWE
+        const siweData = await initSIWE(walletAddress, proxyAgent, currentUserAgent);
+        if (!siweData) {
+          logger.error(`SIWE initialization failed for ${walletAddress}`, { wallet: walletAddress });
+          continue; // Try next attempt
+        }
+        
+        // Prepare SIWE message
+        const message = `nation.fun wants you to sign in with your Ethereum account:
 ${walletAddress}
 
 By signing, you are proving you own this wallet and logging in. This does not initiate a transaction or cost any fees.
@@ -218,36 +247,63 @@ Issued At: ${new Date().toISOString()}
 Resources:
 - https://privy.io`;
 
-    // Step 2: Sign the message
-    const signature = await wallet.signMessage(message);
-    if (!signature) {
-      logger.error(`Failed to sign SIWE message for ${walletAddress}`, { wallet: walletAddress });
-      return null;
+        // Step 2: Sign the message
+        const signature = await wallet.signMessage(message);
+        if (!signature) {
+          logger.error(`Failed to sign SIWE message for ${walletAddress}`, { wallet: walletAddress });
+          continue; // Try next attempt
+        }
+        
+        // Step 3: Authenticate with SIWE
+        const siweAuthData = await authenticateSIWE(message, signature, 'eip155:8453', proxyAgent, currentUserAgent);
+        if (!siweAuthData || !siweAuthData.token) {
+          logger.error(`SIWE authentication failed for ${walletAddress}`, { wallet: walletAddress });
+          continue; // Try next attempt
+        }
+        
+        // Step 4: Login to API
+        const loginData = await login(siweAuthData.token, walletAddress, proxyAgent, currentUserAgent);
+        if (!loginData || !loginData.access_token) {
+          logger.error(`API login failed for ${walletAddress}`, { wallet: walletAddress });
+          
+          // If we got a 404, this wallet might not be registered, skip retries
+          if (loginData === null) {
+            break;
+          }
+          
+          continue; // Try next attempt
+        }
+        
+        // Store successful auth data
+        authData = {
+          accessToken: loginData.access_token,
+          refreshToken: loginData.refresh_token,
+          walletAddress,
+          privyToken: siweAuthData.token,
+          userAgent: currentUserAgent
+        };
+        
+        authSuccess = true;
+        break; // Exit the retry loop
+      } catch (error) {
+        logger.error(`Authentication attempt ${attemptCount} failed for ${walletAddress}: ${error.message}`, { wallet: walletAddress });
+      }
+      
+      // Add a delay before trying the next user agent
+      if (!authSuccess && attemptCount < maxAttempts) {
+        const retryDelay = 5000 + Math.random() * 5000; // 5-10 seconds
+        logger.info(`Waiting ${Math.round(retryDelay / 1000)}s before next authentication attempt...`, { wallet: walletAddress });
+        await sleep(retryDelay);
+      }
     }
     
-    // Step 3: Authenticate with SIWE
-    const authData = await authenticateSIWE(message, signature, 'eip155:8453', proxyAgent, userAgent);
-    if (!authData || !authData.token) {
-      logger.error(`SIWE authentication failed for ${walletAddress}`, { wallet: walletAddress });
+    if (authSuccess) {
+      logger.success(`Authentication successful for wallet ${walletAddress}`, { wallet: walletAddress });
+      return authData;
+    } else {
+      logger.error(`All authentication attempts failed for ${walletAddress}`, { wallet: walletAddress });
       return null;
     }
-    
-    // Step 4: Login to API
-    const loginData = await login(authData.token, walletAddress, proxyAgent, userAgent);
-    if (!loginData || !loginData.access_token) {
-      logger.error(`API login failed for ${walletAddress}`, { wallet: walletAddress });
-      return null;
-    }
-    
-    logger.success(`Authentication successful for wallet ${walletAddress}`, { wallet: walletAddress });
-    
-    return {
-      accessToken: loginData.access_token,
-      refreshToken: loginData.refresh_token,
-      walletAddress,
-      privyToken: authData.token,
-      userAgent // Pass the user agent to be used in subsequent requests
-    };
   } catch (error) {
     logger.error(`Authentication failed: ${error.message}`);
     return null;
