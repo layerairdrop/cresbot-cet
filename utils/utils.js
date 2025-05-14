@@ -115,12 +115,12 @@ function sleep(ms) {
 /**
  * Execute a function with retry logic
  * @param {Function} fn - Function to execute
- * @param {number} [maxRetries=3] - Maximum number of retries
- * @param {number} [baseDelay=2000] - Base delay in ms between retries
- * @param {number} [maxDelay=30000] - Maximum delay in ms between retries
+ * @param {number} [maxRetries=5] - Maximum number of retries
+ * @param {number} [baseDelay=5000] - Base delay in ms between retries
+ * @param {number} [maxDelay=120000] - Maximum delay in ms between retries
  * @returns {Promise<*>} Result of the function
  */
-async function withRetry(fn, maxRetries = 3, baseDelay = 2000, maxDelay = 30000) {
+async function withRetry(fn, maxRetries = 5, baseDelay = 5000, maxDelay = 120000) {
   let retries = 0;
   
   while (true) {
@@ -129,17 +129,25 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 2000, maxDelay = 30000)
     } catch (error) {
       // If we've reached max retries or this isn't a retryable error, throw
       if (retries >= maxRetries || 
-         (error.response && error.response.status !== 429 && error.response.status !== 503)) {
+         (error.response && error.response.status !== 429 && error.response.status !== 503 && error.response.status !== 500)) {
         throw error;
       }
+      
+      // For 429 errors, use a longer backoff
+      const isRateLimitError = error.response && error.response.status === 429;
+      const backoffMultiplier = isRateLimitError ? 3 : 1;
       
       // Calculate delay with exponential backoff and jitter
       const delay = Math.min(
         maxDelay,
-        baseDelay * Math.pow(2, retries) * (0.8 + Math.random() * 0.4)
+        baseDelay * Math.pow(2, retries) * backoffMultiplier * (0.8 + Math.random() * 0.4)
       );
       
-      logger.warn(`Request failed with ${error.message}. Retrying in ${Math.round(delay / 1000)}s (${retries + 1}/${maxRetries})...`);
+      const errorMsg = error.response ? 
+        `Request failed with status code ${error.response.status}` : 
+        `Request failed with ${error.message}`;
+      
+      logger.warn(`${errorMsg}. Retrying in ${Math.round(delay / 1000)}s (${retries + 1}/${maxRetries})...`);
       
       await sleep(delay);
       retries++;
